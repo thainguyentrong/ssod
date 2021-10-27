@@ -24,7 +24,8 @@ This [article](https://arxiv.org/abs/2102.09480) proposed an approach that joint
 
 Our training process is as follows:
 
-- Using labeled data to train the detector (and use Focal Loss - in this repository we use Generalized Focal Loss). The article calls this **burn-in**.
+- Using labeled data to train the detector (and use Focal Loss - in this repository we use Generalized Focal Loss). The article calls this **burn-in** stage.
+- **Student - Teacher mutual learning**: the first stage clones the detector obtained in burn-in stage into the Teacher model and Student model.
 
 ## Results
 
