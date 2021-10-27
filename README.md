@@ -24,4 +24,4 @@ This [article](https://arxiv.org/abs/2102.09480) proposed an approach that joint
 
 Our training is as follows:
 
-- Use labeled data to train the Teacher model (and use Focal Loss). The article calls this step ***burn-in***.
+- Use labeled data to train the Teacher model (and use Focal Loss). The article calls this step **burn-in**.
