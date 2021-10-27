@@ -24,4 +24,6 @@ This [article](https://arxiv.org/abs/2102.09480) proposed an approach that joint
 
 Our training is as follows:
 
-- Using labeled data to train the Teacher model (and use Focal Loss - in this repository we use Generalized Focal Loss). The article calls this step **burn-in**.
+- Using labeled data to train the Teacher model (and use Focal Loss - in this repository we use Generalized Focal Loss)
+- Cloning model into two models and use them as Teacher and Student model.
+- 
