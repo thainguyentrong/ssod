@@ -20,7 +20,7 @@ The nature of class-imbalance in object detection tasks impedes the usage of pse
 
 This [article](https://arxiv.org/abs/2102.09480) proposed an approach that jointly trains a Student and a slowly progressing Teacher in a mutually-beneficial manner, in which the Teacher generates pseudo-labels to train the Student, while the Teacher and the Student are given different augmented input images.
 
-### Methods
+### Method
 
 Our training process is as follows:
 
