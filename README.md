@@ -20,10 +20,16 @@ The nature of class-imbalance in object detection tasks impedes the usage of pse
 
 This [article](https://arxiv.org/abs/2102.09480) proposed an approach that jointly trains a Student and a slowly progressing Teacher in a mutually-beneficial manner, in which the Teacher generates pseudo-labels to train the Student, while the Teacher and the Student are given different augmented input images.
 
-### Method
+## Results
 
-Our training is as follows:
+## Citation
 
-- Using labeled data to train the Teacher model (and use Focal Loss - in this repository we use Generalized Focal Loss)
-- Cloning model into two models and use them as Teacher and Student model.
-- 
+```
+@article{Liu2021UnbiasedTF,
+  title={Unbiased Teacher for Semi-Supervised Object Detection},
+  author={Yen-Cheng Liu and Chih-Yao Ma and Zijian He and Chia-Wen Kuo and Kan Chen and Peizhao Zhang and Bichen Wu and Zsolt Kira and P{\'e}ter Vajda},
+  journal={ArXiv},
+  year={2021},
+  volume={abs/2102.09480}
+}
+```
