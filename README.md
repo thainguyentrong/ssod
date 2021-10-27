@@ -2,7 +2,7 @@
 
 ## Problem
 
-We explained in detail at this [repository](https://github.com/thainguyentrong/gfl-ppe). You need it before reading on.
+We explained in detail at this [repository](https://github.com/thainguyentrong/gfl-ppe). You need watch it before reading on.
 
 ## Our implementation
 
