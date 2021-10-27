@@ -2,7 +2,7 @@
 
 ## Problem
 
-We explained in detail at this [repository](https://github.com/thainguyentrong/gfl-ppe).
+We explained in detail at this [repository](https://github.com/thainguyentrong/gfl-ppe). You need it before reading on.
 
 ## Our implementation
 
@@ -24,4 +24,4 @@ This [article](https://arxiv.org/abs/2102.09480) proposed an approach that joint
 
 Our training is as follows:
 
-- Using labeled data to train the Teacher model (and use Focal Loss). The article calls this step **burn-in**.
+- Using labeled data to train the Teacher model (and use Focal Loss - in this repository we use Generalized Focal Loss). The article calls this step **burn-in**.
