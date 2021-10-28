@@ -197,27 +197,27 @@ def train():
             weak_gt_qfl_batch, weak_gt_dfl_batch, anchor_points, fpn_strides = gttrans(gt_clses_batch, gt_bboxes_batch, weak_source_reg_logit_batch.detach())
             strong_gt_qfl_batch, strong_gt_dfl_batch, _, _ = gttrans(gt_clses_batch, trans_gt_bboxes_batch, strong_source_reg_logit_batch.detach())
 
-            obj_threshold, no_obj_threshold = [], []
+            pos_threshold, neg_threshold = [], []
             for pred, gt in zip(weak_source_cls_distribution.detach().reshape(cfg.batch_size, -1), weak_gt_qfl_batch.reshape(cfg.batch_size, -1)):
-                obj_threshold.append(torch.index_select(input=pred, dim=0, index=(gt > 0).nonzero(as_tuple=False)[:, 0]))
-                no_obj_threshold.append(torch.index_select(input=pred, dim=0, index=(gt == 0).nonzero(as_tuple=False)[:, 0]))
+                pos_threshold.append(torch.index_select(input=pred, dim=0, index=(gt > 0).nonzero(as_tuple=False)[:, 0]))
+                neg_threshold.append(torch.index_select(input=pred, dim=0, index=(gt == 0).nonzero(as_tuple=False)[:, 0]))
 
-            obj_threshold = cfg.tau * torch.cat(obj_threshold, dim=0).mean()
-            no_obj_threshold = torch.cat(no_obj_threshold, dim=0).mean()
+            pos_threshold = cfg.tau * torch.cat(pos_threshold, dim=0).mean()
+            neg_threshold = torch.cat(neg_threshold, dim=0).mean()
 
             ## perform qfl and dfl pseudo label and mask from weak target
             final_max_scores, final_max_id_cls = final_cls_distribution.detach().max(dim=1) # (b, n_flatten), (b, n_flatten)
-            final_obj_mask = (final_max_scores >= obj_threshold) & (final_max_id_cls > 0)
-            final_no_obj_mask = final_max_scores <= no_obj_threshold
+            final_pos_mask_batch = (final_max_scores >= pos_threshold) & (final_max_id_cls > 0)
+            final_neg_mask_batch = final_max_scores <= neg_threshold
 
-            final_total_mask = final_obj_mask | final_no_obj_mask
+            final_total_mask = final_pos_mask_batch | final_neg_mask_batch
             pseudo_qfl_batch = final_cls_distribution.detach()
             pseudo_dfl_batch = intergral(final_reg_distribution.detach()) # (b, 4, n_flatten)
 
             ## perform losses
             weak_source_qfl_loss, weak_source_dfl_loss, weak_source_giou_loss = src_criterion(weak_gt_qfl_batch, weak_gt_dfl_batch, anchor_points, fpn_strides, weak_source_cls_logit_batch, weak_source_reg_logit_batch)
             strong_source_qfl_loss, strong_source_dfl_loss, strong_source_giou_loss = src_criterion(strong_gt_qfl_batch, strong_gt_dfl_batch, anchor_points, fpn_strides, strong_source_cls_logit_batch, strong_source_reg_logit_batch)
-            strong_target_qfl_loss, strong_target_dfl_loss = tgt_criterion(pseudo_qfl_batch, pseudo_dfl_batch, strong_target_cls_logit_batch, strong_target_reg_logit_batch, final_obj_mask, final_total_mask.unsqueeze(dim=1))
+            strong_target_qfl_loss, strong_target_dfl_loss = tgt_criterion(pseudo_qfl_batch, pseudo_dfl_batch, strong_target_cls_logit_batch, strong_target_reg_logit_batch, final_pos_mask_batch, final_total_mask.unsqueeze(dim=1))
 
             weak_source_loss = weak_source_qfl_loss + weak_source_dfl_loss + 2 * weak_source_giou_loss
             strong_source_loss = strong_source_qfl_loss + strong_source_dfl_loss + 2 * strong_source_giou_loss
@@ -234,7 +234,7 @@ def train():
                 optimizer.zero_grad(set_to_none=True)
 
             end = time.time()
-            sys.stdout.write('\rEpoch: %03d, Step: %04d/%d, Mu: %.6f, Obj/No Obj: %.5f/%.5f, Loss: %.9f, Time training: %.2f secs' % (epoch, step+1, n_batches, mu, obj_threshold.item(), no_obj_threshold.item(), loss.item(), end-start))
+            sys.stdout.write('\rEpoch: %03d, Step: %04d/%d, Mu: %.6f, Obj/No Obj: %.5f/%.5f, Loss: %.9f, Time training: %.2f secs' % (epoch, step+1, n_batches, mu, pos_threshold.item(), neg_threshold.item(), loss.item(), end-start))
 
 
         if epoch % cfg.save == 0 or epoch == cfg.epochs:
@@ -251,7 +251,7 @@ def train():
 
         if epoch % cfg.evaluate == 0 or epoch == cfg.epochs:
             with torch.no_grad():
-                pseudo_clses_batch, pseudo_bboxes_batch, pseudo_quality_scores_batch = inference(final_cls_distribution, final_reg_distribution, obj_threshold)
+                pseudo_clses_batch, pseudo_bboxes_batch, pseudo_quality_scores_batch = inference(pseudo_qfl_batch, pseudo_dfl_batch, pos_threshold)
                 weak_target = unnormalize(weak_target, mean=cfg.mean, std=cfg.std)
                 weak_target = (weak_target[0].permute(1, 2, 0).cpu().numpy() * 255).astype('uint8').copy()
 
@@ -272,8 +272,9 @@ def train():
                     pred_cls_batch, pred_reg_batch = model(image)
                     pred_cls_batch = pred_cls_batch.sigmoid()
                     pred_reg_batch = pred_reg_batch.softmax(dim=2)
+                    pred_d_batch = intergral(pred_reg_batch)
 
-                    pred_clses_batch, pred_bboxes_batch, pred_quality_scores_batch = inference(pred_cls_batch, pred_reg_batch, threshold=0.2)
+                    pred_clses_batch, pred_bboxes_batch, pred_quality_scores_batch = inference(pred_cls_batch, pred_d_batch, threshold=0.5)
 
                     eval.append(gt_clses_batch, gt_bboxes_batch, pred_clses_batch, pred_bboxes_batch, pred_quality_scores_batch)
 
@@ -292,6 +293,8 @@ def train():
                 cv2.putText(image, i2c[cls_id], (xmin, ymin), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1, cv2.LINE_AA)
 
             visualize(image, 'valid')
+
+
 
 
 

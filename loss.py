@@ -44,20 +44,20 @@ class SourceCriterion(torch.nn.Module):
         self._intergral = Intergral()
 
     def _qfl_loss(self, pred_batch, target_batch, beta=2):
-        pos_inds = target_batch > 0
+        pos_mask_batch = target_batch > 0
         loss = []
         bce_loss = torch.nn.functional.binary_cross_entropy_with_logits(pred_batch, target_batch, reduction='none')
         bce_loss = bce_loss * (pred_batch.sigmoid() - target_batch).abs().pow(beta)
-        for pos_ind, l in zip(pos_inds, bce_loss):
-            loss.append(l.sum() / (pos_ind.sum() + 1e-3))
+        for pos_mask, l in zip(pos_mask_batch, bce_loss):
+            loss.append(l.sum() / (pos_mask.sum() + 1e-3))
         return torch.stack(loss, dim=0).mean()
 
     def _dfl_loss(self, pred_batch, target_batch):
-        pos_inds = (~torch.isinf(target_batch)).sum(dim=1).bool()
+        pos_mask_batch = (~torch.isinf(target_batch)).sum(dim=1).bool()
         loss = []
-        for pos_ind, pred, target in zip(pos_inds, pred_batch, target_batch):
-            target = target[:, pos_ind]
-            pred = pred[:, :, pos_ind]
+        for pos_mask, pred, target in zip(pos_mask_batch, pred_batch, target_batch):
+            target = target[:, pos_mask]
+            pred = pred[:, :, pos_mask]
 
             target_left = target.long()
             target_right = target_left + 1
@@ -66,23 +66,23 @@ class SourceCriterion(torch.nn.Module):
 
             ce_loss = torch.nn.functional.cross_entropy(pred, target_left, reduction='none') * weight_left + \
                     torch.nn.functional.cross_entropy(pred, target_right, reduction='none') * weight_right # (4, n_pos)
-            ce_loss = ce_loss.sum() / (4 * pos_ind.sum() + 1e-3)
+            ce_loss = ce_loss.sum() / (4 * pos_mask.sum() + 1e-3)
             loss.append(ce_loss)
         return torch.stack(loss, dim=0).mean()
 
     def _giou_loss(self, pred_batch, target_batch, anchor_points, fpn_strides):
-        pos_inds = (~torch.isinf(target_batch)).sum(dim=1).bool()
+        pos_mask_batch = (~torch.isinf(target_batch)).sum(dim=1).bool()
         pred_batch = pred_batch.softmax(dim=2)
         d_batch = self._intergral(pred_batch)
         loss = []
-        for pos_ind, d, target in zip(pos_inds, d_batch, target_batch):
-            if pos_ind.sum() == 0:
+        for pos_mask, d, target in zip(pos_mask_batch, d_batch, target_batch):
+            if pos_mask.sum() == 0:
                 loss.append(torch.tensor(0., requires_grad=True).to(pred_batch.device))
             else:
-                target = target[:, pos_ind].transpose(0, 1)
-                d = d[:, pos_ind].transpose(0, 1)
-                stride = fpn_strides[pos_ind]
-                anchor_point = anchor_points[pos_ind, :] # (y, x) formula
+                target = target[:, pos_mask].transpose(0, 1)
+                d = d[:, pos_mask].transpose(0, 1)
+                stride = fpn_strides[pos_mask]
+                anchor_point = anchor_points[pos_mask, :] # (y, x) formula
 
                 target = target * stride.unsqueeze(dim=1)
                 d = d * stride.unsqueeze(dim=1)
@@ -104,7 +104,7 @@ class SourceCriterion(torch.nn.Module):
                 for pred_bbox, target_bbox in zip(pred_bboxes, target_bboxes):
                     giou = torchvision.ops.generalized_box_iou(pred_bbox.unsqueeze(dim=0), target_bbox.unsqueeze(dim=0)).flatten()
                     giou_loss.append(1. - giou)
-                giou_loss = torch.stack(giou_loss, dim=0).sum() / pos_ind.sum()
+                giou_loss = torch.stack(giou_loss, dim=0).sum() / pos_mask.sum()
                 
                 loss.append(giou_loss)
         return torch.stack(loss, dim=0).mean()

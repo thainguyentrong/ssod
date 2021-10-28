@@ -49,43 +49,36 @@ def compute_loss_target_weight(n_iter, max_iter):
 class Inference:
     def __init__(self):
         self._gttrans = GtTransform()
-        self._intergral = Intergral()
 
-    def __call__(self, cls_dis, reg_dis, threshold):
-        pred_quality_score_batch, pred_label_batch = cls_dis.max(dim=1)
-        pred_quality_score_batch, pred_pos_ind_batch = torch.topk(pred_quality_score_batch, k=cfg.max_object_per_sample, dim=1)
-        pred_d_batch = self._intergral(reg_dis)
+    def __call__(self, cls_dis_batch, pred_d_batch, threshold):
+        pred_quality_score_batch, pred_label_batch = cls_dis_batch.max(dim=1)
+        pred_quality_score_batch, pred_candidate_batch = torch.topk(pred_quality_score_batch, k=cfg.max_object_per_sample, dim=1)
 
         out_clses_batch, out_bboxes_batch, out_quality_scores_batch = [], [], []
-        for pred_quality_score, pred_label, pred_d, pred_pos_ind in zip(pred_quality_score_batch, pred_label_batch, pred_d_batch, pred_pos_ind_batch):
-            pred_label = pred_label[pred_pos_ind]
+        for pred_quality_score, pred_label, pred_d, pred_candidate in zip(pred_quality_score_batch, pred_label_batch, pred_d_batch, pred_candidate_batch):
+            pred_label = pred_label[pred_candidate]
             
-            k_ind = pred_quality_score >= threshold
-            pred_quality_score = pred_quality_score[k_ind]
-            pred_pos_ind = pred_pos_ind[k_ind]
-            pseudo_label = pred_label[k_ind]
+            filter_mask = (pred_quality_score >= threshold) & (pred_label > 0)
+            pred_pos_quality_score = pred_quality_score[filter_mask]
+            pred_pos_ind = pred_candidate[filter_mask]
+            pred_pos_label = pred_label[filter_mask]
 
-            pred_center = self._gttrans._anchor_points_with_scales.to(pred_pos_ind.device)[pred_pos_ind, :] # (y, x) formula
+            anchor_point = self._gttrans._anchor_points_with_scales.to(pred_pos_ind.device)[pred_pos_ind, :] # (y, x) formula
             pred_pos_d = pred_d[:, pred_pos_ind]
             pred_stride = self._gttrans._fpn_strides.to(pred_pos_ind.device)[pred_pos_ind]
             pred_pos_d = (pred_pos_d * pred_stride.unsqueeze(dim=0)).transpose(0, 1)
 
-            pseudo_bbox = torch.stack([
-                torch.clamp(pred_center[:, 0] - pred_pos_d[:, 0], min=0, max=cfg.size[1]),
-                torch.clamp(pred_center[:, 1] - pred_pos_d[:, 1], min=0, max=cfg.size[0]),
-                torch.clamp(pred_center[:, 0] + pred_pos_d[:, 2], min=0, max=cfg.size[1]),
-                torch.clamp(pred_center[:, 1] + pred_pos_d[:, 3], min=0, max=cfg.size[0])
+            pred_pos_bbox = torch.stack([
+                torch.clamp(anchor_point[:, 0] - pred_pos_d[:, 0], min=0, max=cfg.size[1]),
+                torch.clamp(anchor_point[:, 1] - pred_pos_d[:, 1], min=0, max=cfg.size[0]),
+                torch.clamp(anchor_point[:, 0] + pred_pos_d[:, 2], min=0, max=cfg.size[1]),
+                torch.clamp(anchor_point[:, 1] + pred_pos_d[:, 3], min=0, max=cfg.size[0])
             ], dim=-1) # (y, x) formula
 
-            mask = pseudo_label != 0 # positive isn't no_object label
-            pseudo_bbox = pseudo_bbox[mask, :]
-            pseudo_label = pseudo_label[mask]
-            pred_quality_score = pred_quality_score[mask]
-
-            iou_ind = torchvision.ops.nms(pseudo_bbox, pred_quality_score, iou_threshold=0.7)
-            out_bboxes_batch.append(pseudo_bbox[iou_ind, :])
-            out_clses_batch.append(pseudo_label[iou_ind])
-            out_quality_scores_batch.append(pred_quality_score[iou_ind])
+            iou_mask = torchvision.ops.nms(pred_pos_bbox, pred_pos_quality_score, iou_threshold=0.7)
+            out_bboxes_batch.append(pred_pos_bbox[iou_mask, :])
+            out_clses_batch.append(pred_pos_label[iou_mask])
+            out_quality_scores_batch.append(pred_pos_quality_score[iou_mask])
 
         return out_clses_batch, out_bboxes_batch, out_quality_scores_batch
 
@@ -102,8 +95,9 @@ class Evaluation:
         self._pred_quality_scores += pred_quality_scores_batch
 
     def eval(self):
-        Y_true, Y_score = [], []
+        mAP = []
         for (gt_clses, gt_bboxes, pred_clses, pred_bboxes, pred_quality_scores) in zip(self._gt_clses, self._gt_bboxes, self._pred_clses, self._pred_bboxes, self._pred_quality_scores):
+            Y_true, Y_score = [], []
             for (pred_cls, pred_bbox, pred_quality_score) in zip(pred_clses, pred_bboxes, pred_quality_scores):
                 if gt_bboxes.size(0) > 0: 
                     overlap = torchvision.ops.box_iou(pred_bbox.unsqueeze(dim=0), gt_bboxes).squeeze(dim=0)
@@ -119,10 +113,12 @@ class Evaluation:
                 else:
                     Y_true.append(0)
                     Y_score.append(pred_quality_score.item())
-        if len(Y_true) == 0:
-            return 0.
-        return average_precision_score(np.array(Y_true), np.array(Y_score))
+            if len(Y_true) == 0 or np.sum(Y_true) == 0:
+                mAP.append(0.)
+            else:
+                mAP.append(average_precision_score(np.array(Y_true), np.array(Y_score)))
 
+        return np.mean(mAP)
 
 class Resize:
     def __init__(self, nsize):
