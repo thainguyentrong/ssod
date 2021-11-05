@@ -11,6 +11,11 @@ def unnormalize(image, mean, std):
     image = ((image * torch.as_tensor(std).reshape(1, image.size(1), 1, 1).to(image.device)) + torch.as_tensor(mean).reshape(1, image.size(1), 1, 1).to(image.device))
     return image
 
+def load_categories():
+    o2i = {obj: idx for idx, obj in enumerate(cfg.categories)}
+    i2o = {idx: obj for idx, obj in enumerate(cfg.categories)}
+    return o2i, i2o
+
 def disable_batchnorm_tracking(model):
     def fn(module):
         if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
@@ -22,11 +27,6 @@ def enable_batchnorm_tracking(model):
         if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
             module.track_running_stats = True
     model.apply(fn)
-
-def load_categories():
-    o2i = {obj: idx for idx, obj in enumerate(cfg.categories)}
-    i2o = {idx: obj for idx, obj in enumerate(cfg.categories)}
-    return o2i, i2o
 
 def rotate_bbox(bboxes, radians, anchors):
     rotate_mat = torch.stack(
@@ -221,8 +221,8 @@ class GtTransform(torch.nn.Module):
         self._fpn_strides = self._fpn_strides.to(gt_bboxes.device)
 
         gt_cen_bboxes = (gt_bboxes[:, :2] + gt_bboxes[:, 2:]) / 2 # (y, x) formula
-        g2a_dist = torch.cdist(gt_cen_bboxes, self._anchor_points_with_scales, p=2.0)
-        _, k_inds = torch.topk(g2a_dist, k=45, dim=1, largest=False)
+        g2a_dist = torch.cdist(gt_cen_bboxes, self._anchor_points_with_scales, p=2.0) / self._fpn_strides.unsqueeze(dim=0)
+        _, k_inds = torch.topk(g2a_dist, k=36, dim=1, largest=False)
 
         for gt_cls, gt_bbox, k_ind in zip(gt_clses, gt_bboxes, k_inds):
             k_anchors = self._anchor_boxes[k_ind, :] # (k, 4)

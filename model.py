@@ -21,6 +21,8 @@ class FPN(torch.nn.Module):
 
         self._upsampling = Upsample()
         self._relu = torch.nn.ReLU(inplace=True)
+        self._p_8 = ResidualBlock(in_channels=fpn_channels, out_channels=fpn_channels, stride=2)
+        self._p_9 = ResidualBlock(in_channels=fpn_channels, out_channels=fpn_channels, stride=2)
 
     def forward(self, x):
         features = self._backbone(x)
@@ -34,6 +36,10 @@ class FPN(torch.nn.Module):
             x = self._relu(self._upsampling(x, fsize=features[i+1].size()[2:]) + in_feats[i+1])
             p_feats.append(x)
 
+        p_8 = self._p_8(p_feats[0])
+        p_9 = self._p_9(p_8)
+        p_feats = [p_9, p_8] + p_feats
+
         return p_feats[::-1]
 
 class Model(torch.nn.Module):
@@ -41,7 +47,7 @@ class Model(torch.nn.Module):
         super(Model, self).__init__()
         in_channels = 192
         out_channels = 128
-        n_p = 5
+        n_p = 7
         self._fpn = FPN()
         self._n_classes = n_classes
         self._n_reg = cfg.reg_max + 1

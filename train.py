@@ -7,7 +7,7 @@ from dataset import PictorV3Dataset, Transformer, collate_source_fn, collate_tar
 import config as cfg
 from model import Model
 from loss import SourceCriterion, TargetCriterion
-from utils import unnormalize, disable_batchnorm_tracking, enable_batchnorm_tracking, Inference, compute_loss_target_weight, Intergral, GtTransform, Evaluation
+from utils import unnormalize, Inference, GtTransform, Evaluation, Intergral, disable_batchnorm_tracking, enable_batchnorm_tracking, compute_loss_target_weight
 
 use_gpu = torch.cuda.is_available()
 
@@ -111,9 +111,9 @@ def train():
     optimizer = torch.optim.Adadelta(model.parameters(), lr=cfg.lr)
 
     inference = Inference()
-    intergral = Intergral()
     gttrans = GtTransform()
     eval = Evaluation()
+    intergral = Intergral()
 
     if use_gpu:
         model.cuda()
@@ -123,7 +123,7 @@ def train():
         tgt_criterion.cuda()
 
     print('Number of parameters: ', count_parameters(model))
-
+    
     curr_epoch = 0
     step_counter = 0
     n_batches = min(len(source_train_loader), len(target_train_loader))
@@ -139,7 +139,7 @@ def train():
         step_counter = ckpt['local_step']
         print('Restore model')
 
-    
+
     for epoch in range(curr_epoch+1, cfg.epochs+1):
         model.train()
         optimizer.zero_grad(set_to_none=True)
@@ -248,7 +248,6 @@ def train():
             torch.save({'state_dict': model.state_dict()}, ckpt_path)
 
 
-
         if epoch % cfg.evaluate == 0 or epoch == cfg.epochs:
             with torch.no_grad():
                 pseudo_clses_batch, pseudo_bboxes_batch, pseudo_quality_scores_batch = inference(pseudo_qfl_batch, pseudo_dfl_batch, pos_threshold)
@@ -277,7 +276,7 @@ def train():
                     pred_clses_batch, pred_bboxes_batch, pred_quality_scores_batch = inference(pred_cls_batch, pred_d_batch, threshold=0.5)
 
                     eval.append(gt_clses_batch, gt_bboxes_batch, pred_clses_batch, pred_bboxes_batch, pred_quality_scores_batch)
-
+                
             mAP = eval.eval()
             print('mAP:', mAP)
 
@@ -293,8 +292,6 @@ def train():
                 cv2.putText(image, i2c[cls_id], (xmin, ymin), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1, cv2.LINE_AA)
 
             visualize(image, 'valid')
-
-
 
 
 
