@@ -1,13 +1,13 @@
 import torch
 import config as cfg
-from efficient_net import efficient_net
-from utils import Upsample, multi_apply, ResidualBlock
+from efficient_net import efficient_net, MBConvBlock
+from utils import Upsample, multi_apply
 
 class FPN(torch.nn.Module):
     def __init__(self):
         super(FPN, self).__init__()
         self._backbone = efficient_net(mode='b0')
-        self._channels = [320, 192, 112, 80, 40]
+        self._channels = [320, 112, 40]
         fpn_channels = 192
 
         self._in_layers = torch.nn.ModuleList()
@@ -21,8 +21,10 @@ class FPN(torch.nn.Module):
 
         self._upsampling = Upsample()
         self._relu = torch.nn.ReLU(inplace=True)
-        self._p_8 = ResidualBlock(in_channels=fpn_channels, out_channels=fpn_channels, stride=2)
-        self._p_9 = ResidualBlock(in_channels=fpn_channels, out_channels=fpn_channels, stride=2)
+        self._p_4 = MBConvBlock(fpn_channels, fpn_channels, kernel_size=3, stride=2, expand_ratio=4, se_ratio=0.25, drop_connect_rate=None)
+        self._p_5 = MBConvBlock(fpn_channels, fpn_channels, kernel_size=3, stride=2, expand_ratio=4, se_ratio=0.25, drop_connect_rate=None)
+        self._p_6 = MBConvBlock(fpn_channels, fpn_channels, kernel_size=3, stride=2, expand_ratio=4, se_ratio=0.25, drop_connect_rate=None)
+        self._p_7 = MBConvBlock(fpn_channels, fpn_channels, kernel_size=3, stride=2, expand_ratio=4, se_ratio=0.25, drop_connect_rate=None)
 
     def forward(self, x):
         features = self._backbone(x)
@@ -36,9 +38,11 @@ class FPN(torch.nn.Module):
             x = self._relu(self._upsampling(x, fsize=features[i+1].size()[2:]) + in_feats[i+1])
             p_feats.append(x)
 
-        p_8 = self._p_8(p_feats[0])
-        p_9 = self._p_9(p_8)
-        p_feats = [p_9, p_8] + p_feats
+        p_4 = self._p_4(p_feats[0])
+        p_5 = self._p_5(p_4)
+        p_6 = self._p_6(p_5)
+        p_7 = self._p_7(p_6)
+        p_feats = [p_7, p_6, p_5, p_4] + p_feats
 
         return p_feats[::-1]
 

@@ -228,13 +228,13 @@ class GtTransform(torch.nn.Module):
             k_anchors = self._anchor_boxes[k_ind, :] # (k, 4)
             Dg = torchvision.ops.box_iou(gt_bbox.unsqueeze(dim=0), k_anchors).squeeze(dim=0) # (k)
             tg = Dg.mean() + Dg.std()
-            pos_ind = k_ind[Dg >= tg]
+            pos_ind = k_ind[Dg > tg]
 
             for i in pos_ind:
                 anchor_point = self._anchor_points_with_scales[i, :] # (y, x) formula
                 fpn_stride = self._fpn_strides[i]
 
-                if (gt_bbox[0] <= anchor_point[0] <= gt_bbox[2]) and (gt_bbox[1] <= anchor_point[1] <= gt_bbox[3]):
+                if (gt_bbox[0] < anchor_point[0] < gt_bbox[2]) and (gt_bbox[1] < anchor_point[1] < gt_bbox[3]):
                     dtop = (anchor_point[0] - gt_bbox[0]) / fpn_stride
                     dbottom = (gt_bbox[2] - anchor_point[0]) / fpn_stride
                     dleft = (anchor_point[1] - gt_bbox[1]) / fpn_stride

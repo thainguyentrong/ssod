@@ -168,7 +168,7 @@ class EfficientNet(torch.nn.Module):
         c_6 = self._layers[6](c_5)
         c_7 = self._layers[7](c_6)
 
-        return c_7, c_6, c_5, c_4, c_3
+        return c_7, c_5, c_3
 
 def efficient_net(mode='b0'):
     coefficient_params = {
@@ -187,9 +187,9 @@ def efficient_net(mode='b0'):
         {'in_channels': round_filters(16, width_coefficient), 'out_channels': round_filters(24, width_coefficient), 'kernel_size': 3, 'stride': 2, 'expand_ratio': 6, 'se_ratio': None, 'drop_connect_rate': None, 'num_layers': round_repeats(2, depth_coefficient)},
         {'in_channels': round_filters(24, width_coefficient), 'out_channels': round_filters(40, width_coefficient), 'kernel_size': 3, 'stride': 2, 'expand_ratio': 6, 'se_ratio': None, 'drop_connect_rate': None, 'num_layers': round_repeats(2, depth_coefficient)},
         {'in_channels': round_filters(40, width_coefficient), 'out_channels': round_filters(80, width_coefficient), 'kernel_size': 3, 'stride': 2, 'expand_ratio': 6, 'se_ratio': 0.25, 'drop_connect_rate': 0.2, 'num_layers': round_repeats(3, depth_coefficient)},
-        {'in_channels': round_filters(80, width_coefficient), 'out_channels': round_filters(112, width_coefficient), 'kernel_size': 3, 'stride': 2, 'expand_ratio': 6, 'se_ratio': 0.25, 'drop_connect_rate': 0.2, 'num_layers': round_repeats(3, depth_coefficient)},
+        {'in_channels': round_filters(80, width_coefficient), 'out_channels': round_filters(112, width_coefficient), 'kernel_size': 3, 'stride': 1, 'expand_ratio': 6, 'se_ratio': 0.25, 'drop_connect_rate': 0.2, 'num_layers': round_repeats(3, depth_coefficient)},
         {'in_channels': round_filters(112, width_coefficient), 'out_channels': round_filters(192, width_coefficient), 'kernel_size': 3, 'stride': 2, 'expand_ratio': 6, 'se_ratio': 0.25, 'drop_connect_rate': 0.2, 'num_layers': round_repeats(4, depth_coefficient)},
-        {'in_channels': round_filters(192, width_coefficient), 'out_channels': round_filters(320, width_coefficient), 'kernel_size': 3, 'stride': 2, 'expand_ratio': 6, 'se_ratio': 0.25, 'drop_connect_rate': 0.2, 'num_layers': round_repeats(1, depth_coefficient)}
+        {'in_channels': round_filters(192, width_coefficient), 'out_channels': round_filters(320, width_coefficient), 'kernel_size': 3, 'stride': 1, 'expand_ratio': 6, 'se_ratio': 0.25, 'drop_connect_rate': 0.2, 'num_layers': round_repeats(1, depth_coefficient)}
     ]
     model = EfficientNet(layer_params)
     return model
